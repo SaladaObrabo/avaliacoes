@@ -897,6 +897,105 @@
         transition: none !important;
       }
     }
+
+    /* ==============================
+   ANIMAÇÕES SUAVES (entrada + scroll)
+   ============================== */
+    :root {
+      --reveal-dur: 700ms;
+      --reveal-ease: cubic-bezier(.2, .9, .2, 1);
+    }
+
+    /* Estado inicial (antes de entrar) */
+    .reveal {
+      opacity: 0;
+      transform: translateY(14px);
+      transition:
+        opacity var(--reveal-dur) var(--reveal-ease),
+        transform var(--reveal-dur) var(--reveal-ease);
+      will-change: opacity, transform;
+    }
+
+    /* Quando entra */
+    .reveal.in {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+      /* zera X e Y */
+    }
+
+
+    /* Variações */
+    .reveal.fade {
+      transform: none;
+    }
+
+    .reveal.left {
+      transform: translate3d(-14px, 0, 0);
+    }
+
+    .reveal.right {
+      transform: translate3d(14px, 0, 0);
+    }
+
+    .reveal.up {
+      transform: translate3d(0, 16px, 0);
+    }
+
+    .reveal.zoom {
+      transform: translate3d(0, 10px, 0) scale(.985);
+    }
+
+
+    /* Stagger simples por CSS variável */
+    .reveal {
+      transition-delay: var(--d, 0ms);
+    }
+
+    /* quando entrou, zera o deslocamento (independente da direção) */
+    .reveal.in {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+
+    /* garante que as variações NÃO ganhem do .in */
+    .reveal.right.in,
+    .reveal.left.in,
+    .reveal.up.in,
+    .reveal.zoom.in,
+    .reveal.fade.in {
+      transform: translate3d(0, 0, 0);
+    }
+
+
+    /* Animação “pop” leve no carregamento do hero */
+    @keyframes softPop {
+      0% {
+        opacity: 0;
+        transform: translateY(16px) scale(.99);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .hero .hero-card.soft-pop {
+      animation: softPop 750ms var(--reveal-ease) both;
+    }
+
+    /* Se usuário prefere reduzir movimento */
+    @media (prefers-reduced-motion: reduce) {
+
+      .reveal,
+      .reveal.in,
+      .hero .hero-card.soft-pop {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+        animation: none !important;
+      }
+    }
   </style>
 </head>
 
@@ -1166,8 +1265,79 @@
       <div class="modal-body" id="modalBody"></div>
     </div>
   </div>
+  <script>
+    // ==============================
+    // REVEAL ON SCROLL (IntersectionObserver)
+    // ==============================
+    const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+    function setupReveal() {
+      if (prefersReduced) {
+        document.querySelectorAll(".reveal").forEach(el => el.classList.add("in"));
+        return;
+      }
+
+      const io = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in");
+            io.unobserve(entry.target);
+          }
+        }
+      }, {
+        root: null,
+        threshold: 0.12,
+        rootMargin: "0px 0px -8% 0px"
+      });
+
+      document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+    }
+
+    // aplica classes e delays automaticamente
+    function markInitialReveals() {
+      const topbar = document.querySelector(".topbar");
+      const heroCard = document.querySelector(".hero-card");
+      const trust = document.querySelector(".trust");
+      const filterWrap = document.querySelector(".filter-wrap");
+      const faq = document.querySelector(".faq");
+      const footer = document.querySelector("footer");
+
+      // Topbar entra suave
+      if (topbar) { topbar.classList.add("reveal", "fade"); topbar.style.setProperty("--d", "0ms"); }
+
+      // Hero com pop leve
+      if (heroCard) heroCard.classList.add("soft-pop");
+
+      // Trust e seção abaixo entram com reveal
+      if (trust) { trust.classList.add("reveal", "right"); trust.style.setProperty("--d", "60ms"); }
+      if (filterWrap) { filterWrap.classList.add("reveal", "up"); filterWrap.style.setProperty("--d", "80ms"); }
+      if (faq) { faq.classList.add("reveal", "up"); faq.style.setProperty("--d", "80ms"); }
+      if (footer) { footer.classList.add("reveal", "fade"); footer.style.setProperty("--d", "60ms"); }
+    }
+
+    // chama após montar/re-renderizar cards (ex: filtro)
+    function revealCardsStagger(containerSelector, itemSelector) {
+      const container = document.querySelector(containerSelector);
+      if (!container) return;
+
+      const items = [...container.querySelectorAll(itemSelector)];
+      items.forEach((el, i) => {
+        el.classList.add("reveal", "zoom");
+        el.style.setProperty("--d", `${Math.min(i * 35, 280)}ms`);
+      });
+
+      setupReveal();
+    }
+
+    // Rodar assim que DOM estiver pronto
+    document.addEventListener("DOMContentLoaded", () => {
+      markInitialReveals();
+      setupReveal();
+    });
+  </script>
 
   <script>
+
     // ==============================
     // CONFIG WHATSAPP
     // ==============================
@@ -1357,6 +1527,7 @@
 
         grid.appendChild(card);
       }
+      revealCardsStagger("#grid", ".card");
     }
 
     filterCategoryEl.addEventListener("change", render);
