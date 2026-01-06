@@ -1337,244 +1337,225 @@
   </script>
 
   <script>
+  // ==============================
+  // CONFIG WHATSAPP
+  // ==============================
+  const WHATSAPP_NUMBER = "5511988452523";
+  const WHATSAPP_MSG = encodeURIComponent(
+    "Olá! Vi os unboxings no site e quero tirar uma dúvida antes de comprar."
+  );
 
-    // ==============================
-    // CONFIG WHATSAPP
-    // ==============================
-    const WHATSAPP_NUMBER = "5511988452523"; // troque
-    const WHATSAPP_MSG = encodeURIComponent("Olá! Vi os unboxings no site e quero tirar uma dúvida antes de comprar.");
-    function openWhatsApp() {
-      window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`, "_blank", "noopener,noreferrer");
+  function openWhatsApp() {
+    window.open(
+      `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  document.getElementById("btnWhatsappTop")?.addEventListener("click", openWhatsApp);
+  document.getElementById("btnWhatsappFooter")?.addEventListener("click", openWhatsApp);
+  document.getElementById("btnWhatsappFloat")?.addEventListener("click", openWhatsApp);
+
+  // ==============================
+  // CONFIG MANIFEST
+  // ==============================
+  const BUCKET_BASE =
+    "https://s3.7dadj6ojyhgdiows3ssqhsm105frxtwmgvars6zy3j7vxcyoyrodhemtughffjf.shop/wolfpharma-media";
+  const MANIFEST_URL = `${BUCKET_BASE}/videos.json`;
+
+  let VIDEOS = [];
+
+  // ==============================
+  // ELEMENTOS
+  // ==============================
+  const grid = document.getElementById("grid");
+  const filterCategoryEl = document.getElementById("filterCategory");
+  const countEl = document.getElementById("count");
+  const statTotal = document.getElementById("statTotal");
+  const statRecent = document.getElementById("statRecent");
+
+  function formatDateBR(iso) {
+    try {
+      return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR");
+    } catch {
+      return iso;
     }
-    document.getElementById("btnWhatsappTop").addEventListener("click", openWhatsApp);
-    document.getElementById("btnWhatsappFooter").addEventListener("click", openWhatsApp);
-    document.getElementById("btnWhatsappFloat").addEventListener("click", openWhatsApp);
+  }
 
-    // ==============================
-    // CATEGORIAS PRÉ-DEFINIDAS
-    // category: tirzepatida | anabolizantes | depoimento | unboxing
-    // ==============================
+  function updateMostRecent() {
+    const sorted = [...VIDEOS].sort((a, b) =>
+      (b.date || "").localeCompare(a.date || "")
+    );
+    statRecent.textContent = sorted[0]?.date
+      ? formatDateBR(sorted[0].date)
+      : "—";
+  }
 
-    // ==============================
-    // CONFIG DO MANIFEST (MinIO / S3)
-    // ==============================
-    const BUCKET_BASE = "https://s3.7dadj6ojyhgdiows3ssqhsm105frxtwmgvars6zy3j7vxcyoyrodhemtughffjf.shop/wolfpharma-media";
-    const MANIFEST_URL = `${BUCKET_BASE}/videos.json`;
-
-    // VIDEOS agora vem do manifest
-    let VIDEOS = [];
-
-
-    // ==============================
-    // RENDER
-    // ==============================
-    const grid = document.getElementById("grid");
-    const filterCategoryEl = document.getElementById("filterCategory");
-    const countEl = document.getElementById("count");
-    const statTotal = document.getElementById("statTotal");
-    const statRecent = document.getElementById("statRecent");
-
-    function formatDateBR(iso) {
-      try {
-        return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR");
-      } catch { return iso; }
-    }
-
-    function updateMostRecent() {
-      const sorted = [...VIDEOS].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-      const top = sorted[0];
-      statRecent.textContent = top?.date ? formatDateBR(top.date) : "—";
-    }
-
-
-    async function loadVideos() {
-      try {
-        // Evita cache agressivo
-        const r = await fetch(`${MANIFEST_URL}?v=${Date.now()}`, { cache: "no-store" });
-        if (!r.ok) throw new Error("Falha ao carregar videos.json");
-
-        const data = await r.json();
-        VIDEOS = Array.isArray(data) ? data : [];
-      } catch (err) {
-        console.error("Erro ao carregar vídeos:", err);
-        VIDEOS = [];
-      }
-
-      // Atualiza stats depois que carregar
-      statTotal.textContent = String(VIDEOS.length);
-      updateMostRecent();
-      render();
+  async function loadVideos() {
+    try {
+      const r = await fetch(`${MANIFEST_URL}?v=${Date.now()}`, { cache: "no-store" });
+      if (!r.ok) throw new Error("Erro ao carregar manifest");
+      const data = await r.json();
+      VIDEOS = Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.error(e);
+      VIDEOS = [];
     }
 
+    statTotal.textContent = VIDEOS.length;
+    updateMostRecent();
+    render();
+  }
 
-    function categoryLabel(cat) {
-      const map = {
-        tirzepatida: "Tirzepatida",
-        anabolizantes: "Anabolizantes",
-        depoimento: "Depoimento",
-        unboxing: "Unboxing"
+  function categoryLabel(cat) {
+    const map = {
+      tirzepatida: "Tirzepatida",
+      anabolizantes: "Anabolizantes",
+      depoimento: "Depoimento",
+      unboxing: "Unboxing",
+    };
+    return map[cat] || "Categoria";
+  }
+
+  // ==============================
+  // RENDER
+  // ==============================
+  function render() {
+    const c = filterCategoryEl.value;
+
+    const filtered = VIDEOS
+      .filter(v => c === "all" || v.category === c)
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+    grid.innerHTML = "";
+    countEl.textContent = filtered.length;
+
+    for (const v of filtered) {
+      const card = document.createElement("article");
+      card.className = "card";
+
+      const thumb = document.createElement("div");
+      thumb.className = "thumb";
+
+      const img = document.createElement("img");
+      img.src = v.thumb || "";
+      img.alt = v.title || "";
+      img.loading = "lazy";
+      img.onerror = () => {
+        img.remove();
+        thumb.style.background =
+          "linear-gradient(135deg, rgba(26,63,206,.14), rgba(66,165,245,.16))";
       };
-      return map[cat] || "Categoria";
-    }
 
-    function render() {
-      const c = filterCategoryEl.value;
+      const badge = document.createElement("div");
+      badge.className = "badge";
+      badge.innerHTML = `<span>✅</span> Cliente recebeu`;
 
-      const filtered = VIDEOS
-        .filter(v => (c === "all") || (v.category === c))
-        .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      thumb.appendChild(img);
+      thumb.appendChild(badge);
 
-      grid.innerHTML = "";
-      countEl.textContent = String(filtered.length);
-
-      if (filtered.length === 0) {
-        const empty = document.createElement("div");
-        empty.style.gridColumn = "1 / -1";
-        empty.style.padding = "16px";
-        empty.style.borderRadius = "18px";
-        empty.style.background = "rgba(255,255,255,.88)";
-        empty.style.border = "1px solid rgba(26,63,206,.10)";
-        empty.style.boxShadow = "0 10px 24px rgba(14,35,120,.10)";
-        empty.innerHTML = `
-          <div style="font-weight:900; color: var(--blue-dark); margin-bottom:6px;">Nenhum vídeo nessa categoria</div>
-          <div style="color: var(--muted); font-weight:700; font-size:13px; line-height:1.5;">
-            Selecione outra opção no filtro acima.
-          </div>
-        `;
-        grid.appendChild(empty);
-        return;
-      }
-
-      for (const v of filtered) {
-        const card = document.createElement("article");
-        card.className = "card";
-
-        const thumb = document.createElement("div");
-        thumb.className = "thumb";
-
-        const img = document.createElement("img");
-        img.alt = v.title;
-        img.loading = "lazy";
-        img.src = v.thumb || "";
-        img.onerror = () => { img.remove(); thumb.style.background = "linear-gradient(135deg, rgba(26,63,206,.14), rgba(66,165,245,.16))"; };
-
-        const badge = document.createElement("div");
-        badge.className = "badge";
-        badge.innerHTML = `<span aria-hidden="true">✅</span> Cliente recebeu`;
-
+      // ▶ Play apenas se for vídeo
+      if (v.source?.kind === "mp4") {
         const play = document.createElement("div");
         play.className = "play";
         play.innerHTML = `
-          <div class="btn" aria-hidden="true">
+          <div class="btn">
             <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           </div>
         `;
-
-        thumb.appendChild(img);
-        thumb.appendChild(badge);
-        thumb.appendChild(play);
-        thumb.style.cursor = "pointer";
-        thumb.addEventListener("click", () => openVideo(v));
-
-        play.style.cursor = "pointer";
-        play.addEventListener("click", (e) => {
+        play.addEventListener("click", e => {
           e.stopPropagation();
-          openVideo(v);
+          openMedia(v);
         });
-
-
-        const content = document.createElement("div");
-        content.className = "content";
-
-        const title = document.createElement("h3");
-        title.className = "title";
-        title.textContent = v.title;
-
-        const meta = document.createElement("div");
-        meta.className = "meta";
-        meta.innerHTML = `<span>${v.date ? formatDateBR(v.date) : ""}</span>`;
-
-        const tags = document.createElement("div");
-        tags.style.display = "flex";
-        tags.style.gap = "8px";
-        tags.style.flexWrap = "wrap";
-        tags.innerHTML = `
-          <span class="tag">${categoryLabel(v.category)}</span>
-          ${v.note ? `<span class="tag" style="background: rgba(187,222,251,.55);">${v.note}</span>` : ""}
-        `;
-
-        const actions = document.createElement("div");
-        actions.className = "actions";
-
-        const btnWatch = document.createElement("button");
-        btnWatch.className = "btn-solid";
-        btnWatch.type = "button";
-        btnWatch.innerHTML = `<span aria-hidden="true">▶</span> Assistir`;
-        btnWatch.addEventListener("click", () => openVideo(v));
-        // Clicar na thumb abre o vídeo (inclui o play do centro)
-        thumb.style.cursor = "pointer";
-        thumb.addEventListener("click", () => openVideo(v));
-
-        actions.appendChild(btnWatch);
-
-        content.appendChild(title);
-        content.appendChild(meta);
-        content.appendChild(tags);
-        content.appendChild(actions);
-
-        card.appendChild(thumb);
-        card.appendChild(content);
-
-        grid.appendChild(card);
-      }
-      revealCardsStagger("#grid", ".card");
-    }
-
-    filterCategoryEl.addEventListener("change", render);
-
-    // ==============================
-    // MODAL / PLAYER
-    // ==============================
-    const modal = document.getElementById("modal");
-    const modalClose = document.getElementById("modalClose");
-    const modalTitle = document.getElementById("modalTitle");
-    const modalBody = document.getElementById("modalBody");
-
-    function openVideo(v) {
-      modalTitle.textContent = v.title || "Assistir vídeo";
-      modalBody.innerHTML = "";
-
-      if (v.source?.kind === "youtube") {
-        const iframe = document.createElement("iframe");
-        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-        iframe.allowFullscreen = true;
-        iframe.referrerPolicy = "strict-origin-when-cross-origin";
-        iframe.src = `https://www.youtube-nocookie.com/embed/${v.source.id}?autoplay=1&rel=0&modestbranding=1`;
-        modalBody.appendChild(iframe);
-      } else if (v.source?.kind === "mp4") {
-        const video = document.createElement("video");
-        video.controls = true;
-        video.autoplay = true;
-        video.playsInline = true;
-        video.src = v.source.url;
-        modalBody.appendChild(video);
-      } else {
-        modalBody.innerHTML = `<div style="color:#fff; padding:16px; font-weight:800;">Fonte de vídeo inválida.</div>`;
+        thumb.appendChild(play);
       }
 
-      modal.classList.add("open");
+      thumb.addEventListener("click", () => openMedia(v));
+      thumb.style.cursor = "pointer";
+
+      const content = document.createElement("div");
+      content.className = "content";
+
+      const title = document.createElement("h3");
+      title.className = "title";
+      title.textContent = v.title || "";
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.innerHTML = `<span>${v.date ? formatDateBR(v.date) : ""}</span>`;
+
+      const tags = document.createElement("div");
+      tags.style.display = "flex";
+      tags.style.gap = "8px";
+      tags.style.flexWrap = "wrap";
+      tags.innerHTML = `
+        <span class="tag">${categoryLabel(v.category)}</span>
+        ${v.note ? `<span class="tag" style="background:rgba(187,222,251,.55)">${v.note}</span>` : ""}
+      `;
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+
+      const btn = document.createElement("button");
+      btn.className = "btn-solid";
+      btn.innerHTML = v.source?.kind === "mp4" ? "▶ Assistir" : "🖼 Ver imagem";
+      btn.addEventListener("click", () => openMedia(v));
+
+      actions.appendChild(btn);
+
+      content.append(title, meta, tags, actions);
+      card.append(thumb, content);
+      grid.appendChild(card);
     }
 
-    function closeModal() {
-      modal.classList.remove("open");
-      modalBody.innerHTML = "";
-    }
-    modalClose.addEventListener("click", closeModal);
-    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+    revealCardsStagger("#grid", ".card");
+  }
 
-    loadVideos();
-  </script>
+  filterCategoryEl.addEventListener("change", render);
+
+  // ==============================
+  // MODAL
+  // ==============================
+  const modal = document.getElementById("modal");
+  const modalClose = document.getElementById("modalClose");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalBody = document.getElementById("modalBody");
+
+  function openMedia(v) {
+    modalTitle.textContent = v.title || "";
+    modalBody.innerHTML = "";
+
+    if (v.source?.kind === "mp4") {
+      const video = document.createElement("video");
+      video.controls = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.src = v.source.url;
+      modalBody.appendChild(video);
+    } else {
+      const img = document.createElement("img");
+      img.src = v.source?.url || v.thumb;
+      img.style.maxWidth = "100%";
+      img.style.borderRadius = "12px";
+      modalBody.appendChild(img);
+    }
+
+    modal.classList.add("open");
+  }
+
+  function closeModal() {
+    modal.classList.remove("open");
+    modalBody.innerHTML = "";
+  }
+
+  modalClose.addEventListener("click", closeModal);
+  modal.addEventListener("click", e => e.target === modal && closeModal());
+  document.addEventListener("keydown", e => e.key === "Escape" && closeModal());
+
+  loadVideos();
+</script>
+
 </body>
 
 </html>
