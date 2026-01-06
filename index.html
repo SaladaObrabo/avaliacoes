@@ -1144,6 +1144,15 @@
 
       <div class="grid" id="grid" aria-label="Lista de vídeos"></div>
 
+      <div class="wrap" style="margin-top:14px;">
+        <div style="display:flex; justify-content:center;">
+          <button class="cta" id="btnLoadMore" type="button" style="display:none; min-width:220px;">
+            Carregar mais
+          </button>
+        </div>
+      </div>
+
+
       <!-- FAQ -->
       <section id="faq" style="margin-top:28px;">
         <div class="kicker" style="margin-bottom:12px;">
@@ -1338,225 +1347,255 @@
   </script>
 
   <script>
-  // ==============================
-  // CONFIG WHATSAPP
-  // ==============================
-  const WHATSAPP_NUMBER = "5511988452523";
-  const WHATSAPP_MSG = encodeURIComponent(
-    "Olá! Vi os unboxings no site e quero tirar uma dúvida antes de comprar."
-  );
-
-  function openWhatsApp() {
-    window.open(
-      `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`,
-      "_blank",
-      "noopener,noreferrer"
+    // ==============================
+    // CONFIG WHATSAPP
+    // ==============================
+    const WHATSAPP_NUMBER = "5511988452523";
+    const WHATSAPP_MSG = encodeURIComponent(
+      "Olá! Vi os unboxings no site e quero tirar uma dúvida antes de comprar."
     );
-  }
 
-  document.getElementById("btnWhatsappTop")?.addEventListener("click", openWhatsApp);
-  document.getElementById("btnWhatsappFooter")?.addEventListener("click", openWhatsApp);
-  document.getElementById("btnWhatsappFloat")?.addEventListener("click", openWhatsApp);
-
-  // ==============================
-  // CONFIG MANIFEST
-  // ==============================
-  const BUCKET_BASE =
-    "https://s3.7dadj6ojyhgdiows3ssqhsm105frxtwmgvars6zy3j7vxcyoyrodhemtughffjf.shop/wolfpharma-media";
-  const MANIFEST_URL = `${BUCKET_BASE}/videos.json`;
-
-  let VIDEOS = [];
-
-  // ==============================
-  // ELEMENTOS
-  // ==============================
-  const grid = document.getElementById("grid");
-  const filterCategoryEl = document.getElementById("filterCategory");
-  const countEl = document.getElementById("count");
-  const statTotal = document.getElementById("statTotal");
-  const statRecent = document.getElementById("statRecent");
-
-  function formatDateBR(iso) {
-    try {
-      return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR");
-    } catch {
-      return iso;
-    }
-  }
-
-  function updateMostRecent() {
-    const sorted = [...VIDEOS].sort((a, b) =>
-      (b.date || "").localeCompare(a.date || "")
-    );
-    statRecent.textContent = sorted[0]?.date
-      ? formatDateBR(sorted[0].date)
-      : "—";
-  }
-
-  async function loadVideos() {
-    try {
-      const r = await fetch(`${MANIFEST_URL}?v=${Date.now()}`, { cache: "no-store" });
-      if (!r.ok) throw new Error("Erro ao carregar manifest");
-      const data = await r.json();
-      VIDEOS = Array.isArray(data) ? data : [];
-    } catch (e) {
-      console.error(e);
-      VIDEOS = [];
+    function openWhatsApp() {
+      window.open(
+        `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
     }
 
-    statTotal.textContent = VIDEOS.length;
-    updateMostRecent();
-    render();
-  }
+    document.getElementById("btnWhatsappTop")?.addEventListener("click", openWhatsApp);
+    document.getElementById("btnWhatsappFooter")?.addEventListener("click", openWhatsApp);
+    document.getElementById("btnWhatsappFloat")?.addEventListener("click", openWhatsApp);
 
-  function categoryLabel(cat) {
-    const map = {
-      tirzepatida: "Tirzepatida",
-      retratutida: "Retratutida",
-      anabolizantes: "Anabolizantes",
-      depoimento: "Depoimento",
-      unboxing: "Unboxing",
-    };
-    return map[cat] || "Categoria";
-  }
+    // ==============================
+    // CONFIG MANIFEST
+    // ==============================
+    const BUCKET_BASE =
+      "https://s3.7dadj6ojyhgdiows3ssqhsm105frxtwmgvars6zy3j7vxcyoyrodhemtughffjf.shop/wolfpharma-media";
+    const MANIFEST_URL = `${BUCKET_BASE}/videos.json`;
 
-  // ==============================
-  // RENDER
-  // ==============================
-  function render() {
-    const c = filterCategoryEl.value;
+    let VIDEOS = [];
 
-    const filtered = VIDEOS
-      .filter(v => c === "all" || v.category === c)
-      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    // ==============================
+    // ELEMENTOS
+    // ==============================
+    const grid = document.getElementById("grid");
+    const filterCategoryEl = document.getElementById("filterCategory");
+    const countEl = document.getElementById("count");
+    const statTotal = document.getElementById("statTotal");
+    const statRecent = document.getElementById("statRecent");
 
-    grid.innerHTML = "";
-    countEl.textContent = filtered.length;
+    const btnLoadMore = document.getElementById("btnLoadMore");
 
-    for (const v of filtered) {
-      const card = document.createElement("article");
-      card.className = "card";
+    const PAGE_SIZE = 6;
+    let visibleCount = PAGE_SIZE;
 
-      const thumb = document.createElement("div");
-      thumb.className = "thumb";
 
-      const img = document.createElement("img");
-      img.src = v.thumb || "";
-      img.alt = v.title || "";
-      img.loading = "lazy";
-      img.onerror = () => {
-        img.remove();
-        thumb.style.background =
-          "linear-gradient(135deg, rgba(26,63,206,.14), rgba(66,165,245,.16))";
+    function formatDateBR(iso) {
+      try {
+        return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR");
+      } catch {
+        return iso;
+      }
+    }
+
+    function updateMostRecent() {
+      const sorted = [...VIDEOS].sort((a, b) =>
+        (b.date || "").localeCompare(a.date || "")
+      );
+      statRecent.textContent = sorted[0]?.date
+        ? formatDateBR(sorted[0].date)
+        : "—";
+    }
+
+    async function loadVideos() {
+      try {
+        const r = await fetch(`${MANIFEST_URL}?v=${Date.now()}`, { cache: "no-store" });
+        if (!r.ok) throw new Error("Erro ao carregar manifest");
+        const data = await r.json();
+        VIDEOS = Array.isArray(data) ? data : [];
+      } catch (e) {
+        console.error(e);
+        VIDEOS = [];
+      }
+
+      statTotal.textContent = VIDEOS.length;
+      updateMostRecent();
+      render(true);
+    }
+
+    function categoryLabel(cat) {
+      const map = {
+        tirzepatida: "Tirzepatida",
+        retratutida: "Retratutida",
+        anabolizantes: "Anabolizantes",
+        depoimento: "Depoimento",
+        unboxing: "Unboxing",
       };
+      return map[cat] || "Categoria";
+    }
 
-      const badge = document.createElement("div");
-      badge.className = "badge";
-      badge.innerHTML = `<span>✅</span> Cliente recebeu`;
+    // ==============================
+    // RENDER
+    // ==============================
+    function render(reset = false) {
+      const c = filterCategoryEl.value;
 
-      thumb.appendChild(img);
-      thumb.appendChild(badge);
+      const filteredAll = VIDEOS
+        .filter(v => c === "all" || v.category === c)
+        .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
-      // ▶ Play apenas se for vídeo
-      if (v.source?.kind === "mp4") {
-        const play = document.createElement("div");
-        play.className = "play";
-        play.innerHTML = `
+      // total de resultados do filtro (continua mostrando o total)
+      countEl.textContent = filteredAll.length;
+
+      // reset quando trocar filtro / recarregar
+      if (reset) visibleCount = PAGE_SIZE;
+
+      // recorte do que vai aparecer
+      const filtered = filteredAll.slice(0, visibleCount);
+
+      grid.innerHTML = "";
+
+
+      for (const v of filtered) {
+        const card = document.createElement("article");
+        card.className = "card";
+
+        const thumb = document.createElement("div");
+        thumb.className = "thumb";
+
+        const img = document.createElement("img");
+        img.src = v.thumb || "";
+        img.alt = v.title || "";
+        img.loading = "lazy";
+        img.onerror = () => {
+          img.remove();
+          thumb.style.background =
+            "linear-gradient(135deg, rgba(26,63,206,.14), rgba(66,165,245,.16))";
+        };
+
+        const badge = document.createElement("div");
+        badge.className = "badge";
+        badge.innerHTML = `<span>✅</span> Cliente recebeu`;
+
+        thumb.appendChild(img);
+        thumb.appendChild(badge);
+
+        // ▶ Play apenas se for vídeo
+        if (v.source?.kind === "mp4") {
+          const play = document.createElement("div");
+          play.className = "play";
+          play.innerHTML = `
           <div class="btn">
             <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           </div>
         `;
-        play.addEventListener("click", e => {
-          e.stopPropagation();
-          openMedia(v);
-        });
-        thumb.appendChild(play);
-      }
+          play.addEventListener("click", e => {
+            e.stopPropagation();
+            openMedia(v);
+          });
+          thumb.appendChild(play);
+        }
 
-      thumb.addEventListener("click", () => openMedia(v));
-      thumb.style.cursor = "pointer";
+        thumb.addEventListener("click", () => openMedia(v));
+        thumb.style.cursor = "pointer";
 
-      const content = document.createElement("div");
-      content.className = "content";
+        const content = document.createElement("div");
+        content.className = "content";
 
-      const title = document.createElement("h3");
-      title.className = "title";
-      title.textContent = v.title || "";
+        const title = document.createElement("h3");
+        title.className = "title";
+        title.textContent = v.title || "";
 
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.innerHTML = `<span>${v.date ? formatDateBR(v.date) : ""}</span>`;
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.innerHTML = `<span>${v.date ? formatDateBR(v.date) : ""}</span>`;
 
-      const tags = document.createElement("div");
-      tags.style.display = "flex";
-      tags.style.gap = "8px";
-      tags.style.flexWrap = "wrap";
-      tags.innerHTML = `
+        const tags = document.createElement("div");
+        tags.style.display = "flex";
+        tags.style.gap = "8px";
+        tags.style.flexWrap = "wrap";
+        tags.innerHTML = `
         <span class="tag">${categoryLabel(v.category)}</span>
         ${v.note ? `<span class="tag" style="background:rgba(187,222,251,.55)">${v.note}</span>` : ""}
       `;
 
-      const actions = document.createElement("div");
-      actions.className = "actions";
+        const actions = document.createElement("div");
+        actions.className = "actions";
 
-      const btn = document.createElement("button");
-      btn.className = "btn-solid";
-      btn.innerHTML = v.source?.kind === "mp4" ? "▶ Assistir" : "🖼 Ver imagem";
-      btn.addEventListener("click", () => openMedia(v));
+        const btn = document.createElement("button");
+        btn.className = "btn-solid";
+        btn.innerHTML = v.source?.kind === "mp4" ? "▶ Assistir" : "🖼 Ver imagem";
+        btn.addEventListener("click", () => openMedia(v));
 
-      actions.appendChild(btn);
+        actions.appendChild(btn);
 
-      content.append(title, meta, tags, actions);
-      card.append(thumb, content);
-      grid.appendChild(card);
+        content.append(title, meta, tags, actions);
+        card.append(thumb, content);
+        grid.appendChild(card);
+      }
+
+      // mostra/oculta botão Carregar Mais
+      if (btnLoadMore) {
+        const hasMore = visibleCount < filteredAll.length;
+        btnLoadMore.style.display = hasMore ? "inline-flex" : "none";
+        btnLoadMore.textContent = hasMore
+          ? `Carregar mais (${Math.min(PAGE_SIZE, filteredAll.length - visibleCount)} novos)`
+          : "Carregar mais";
+      }
+      revealCardsStagger("#grid", ".card");
     }
 
-    revealCardsStagger("#grid", ".card");
-  }
+    filterCategoryEl.addEventListener("change", () => render(true));
+    btnLoadMore?.addEventListener("click", () => {
+      const c = filterCategoryEl.value;
+      const total = VIDEOS.filter(v => c === "all" || v.category === c).length;
 
-  filterCategoryEl.addEventListener("change", render);
+      visibleCount = Math.min(visibleCount + PAGE_SIZE, total);
+      render(false);
+    });
 
-  // ==============================
-  // MODAL
-  // ==============================
-  const modal = document.getElementById("modal");
-  const modalClose = document.getElementById("modalClose");
-  const modalTitle = document.getElementById("modalTitle");
-  const modalBody = document.getElementById("modalBody");
+    // ==============================
+    // MODAL
+    // ==============================
+    const modal = document.getElementById("modal");
+    const modalClose = document.getElementById("modalClose");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalBody = document.getElementById("modalBody");
 
-  function openMedia(v) {
-    modalTitle.textContent = v.title || "";
-    modalBody.innerHTML = "";
+    function openMedia(v) {
+      modalTitle.textContent = v.title || "";
+      modalBody.innerHTML = "";
 
-    if (v.source?.kind === "mp4") {
-      const video = document.createElement("video");
-      video.controls = true;
-      video.autoplay = true;
-      video.playsInline = true;
-      video.src = v.source.url;
-      modalBody.appendChild(video);
-    } else {
-      const img = document.createElement("img");
-      img.src = v.source?.url || v.thumb;
-      img.style.maxWidth = "100%";
-      img.style.borderRadius = "12px";
-      modalBody.appendChild(img);
+      if (v.source?.kind === "mp4") {
+        const video = document.createElement("video");
+        video.controls = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        video.src = v.source.url;
+        modalBody.appendChild(video);
+      } else {
+        const img = document.createElement("img");
+        img.src = v.source?.url || v.thumb;
+        img.style.maxWidth = "100%";
+        img.style.borderRadius = "12px";
+        modalBody.appendChild(img);
+      }
+
+      modal.classList.add("open");
     }
 
-    modal.classList.add("open");
-  }
+    function closeModal() {
+      modal.classList.remove("open");
+      modalBody.innerHTML = "";
+    }
 
-  function closeModal() {
-    modal.classList.remove("open");
-    modalBody.innerHTML = "";
-  }
+    modalClose.addEventListener("click", closeModal);
+    modal.addEventListener("click", e => e.target === modal && closeModal());
+    document.addEventListener("keydown", e => e.key === "Escape" && closeModal());
 
-  modalClose.addEventListener("click", closeModal);
-  modal.addEventListener("click", e => e.target === modal && closeModal());
-  document.addEventListener("keydown", e => e.key === "Escape" && closeModal());
-
-  loadVideos();
-</script>
+    loadVideos();
+  </script>
 
 </body>
 
